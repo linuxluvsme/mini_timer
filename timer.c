@@ -24,6 +24,41 @@ typedef struct lib_timer{
 
 timer_lib_t *head = NULL; 
 
+/* This function is junk handler - replace with custom*/
+int temp_handler(void *ctx)
+{
+	struct timeval now;	
+	struct tm 	*ptm;
+
+	gettimeofday(&now,0);
+	
+	printf("\n i am called");
+	ptm = localtime (&now.tv_sec); 
+    /* Format the date and time, down to a single second. */ 
+	strftime (time_string, sizeof (time_string), "%Y-%m-%d %H:%M:%S", ptm); 
+}
+
+/* REMOVE ME : debugging the doubly. */
+int timeout_print()
+{
+	timer_lib_t **timer_lib_temp = &head,**timer_prev;;
+	printf("\n printing");
+	while(*timer_lib_temp) {
+		printf("\n  %d %d \n",
+				(*timer_lib_temp)->expire_timer.tv_sec,
+				(*timer_lib_temp)->expire_timer.tv_usec);
+		timer_prev = timer_lib_temp;
+		timer_lib_temp=&((*timer_lib_temp)->next);
+	}
+	timer_lib_temp=timer_prev;
+	printf("\n reverse");
+	while(*timer_lib_temp){
+		printf("\n  %d %d \n",
+				(*timer_lib_temp)->expire_timer.tv_sec,
+				(*timer_lib_temp)->expire_timer.tv_usec);
+		timer_lib_temp =&((*timer_lib_temp)->prev);
+	}
+}
 
 int
 timeval_subtract (struct timeval *x, struct timeval *y)
@@ -82,50 +117,50 @@ int timeout_register(int secs,timeout_handler handler,void *usr_ctx)
 
 	timer_lib_temp->next = *temp_head;
 	timer_lib_temp->prev = temp_prev;	
-    if(*temp_head != NULL) {
+        if(*temp_head != NULL) {
 		(*temp_head)->prev = timer_lib_temp;
 	}
 	*temp_head = timer_lib_temp;
 }
 
-int timeout_print()
-{
-	timer_lib_t **timer_lib_temp = &head,**timer_prev;;
-	printf("\n printing");
-	while(*timer_lib_temp) {
-		printf("\n  %d %d \n",
-				(*timer_lib_temp)->expire_timer.tv_sec,
-				(*timer_lib_temp)->expire_timer.tv_usec);
-		timer_prev = timer_lib_temp;
-		timer_lib_temp=&((*timer_lib_temp)->next);
-	}
-	timer_lib_temp=timer_prev;
-	printf("\n revers");
-	while(*timer_lib_temp){
-		printf("\n  %d %d \n",
-				(*timer_lib_temp)->expire_timer.tv_sec,
-				(*timer_lib_temp)->expire_timer.tv_usec);
-		timer_lib_temp =&((*timer_lib_temp)->prev);
-	}
-}
 
-int temp_handler(void *ctx)
+
+int temp_deregister()
 {
-	printf("\n i am called");
+	
 }
 
 int main()
 {
 	struct timeval now;
+	struct *temp_head = &head;
+
 	timeout_register(2,&temp_handler,(void *)1);
 	timeout_register(3,&temp_handler,(void *)2);
 	timeout_register(4,&temp_handler,(void *)3);
 	timeout_register(5,&temp_handler,(void *)4);
 	timeout_register(6,&temp_handler,(void *)5);
+
+	/* I am infinite, i am god */
+ 
 	while(1){
+		
+		if(*temp){
+			gettimeofday(&now,0);
+
+			/* work hard, never sleep */	
+			if(&now,&(*temp_head->expire_timer))
+				continue;
+
+			/* Strinking the clock, calling the paylod */
+
+			*temp_head->handler(*temp_head->usr_ctx);
 			
+			/* rework on the doubly, remove the expired*/
+			
+			
+		}		
 		
 	}
 	timeout_print();	
-	
 }
