@@ -10,18 +10,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#define FALSE 0
+#include <pthread.h>
 
-typedef int (*timeout_handler)(void *usr_ctr);
+#define FALSE 0
+#define TRUE 1
+#define MAX_TIMER 15
+
+typedef int (*timeout_handler)(int usr_ctx);
 
 typedef struct lib_timer{
 	struct timeval   expire_timer;
 	timeout_handler  handler;
-	void 			 *usr_ctx;	
+	int 			 usr_ctx;	
+	//change usr_ctx to void* type to pass user define
+	//parameters, for functionality purpose adding an intger
+	//which should be the case in real scenario
 	struct lib_timer *prev, *next;
 }timer_lib_t;
 
-
+pthread_mutex_t doubly_lock;
 timer_lib_t *head = NULL; 
 
 void print_currenttime()
@@ -39,9 +46,9 @@ void print_currenttime()
 }
 
 /* This function is junk handler - replace with custom*/
-int temp_handler(void *ctx)
+int temp_handler(int ctx)
 {
-	printf("\n function called - %d ; ",ctx);
+	printf("\n function NO %d called  ; ",ctx);
 	print_currenttime();
 }
 
@@ -94,7 +101,7 @@ timeval_subtract (struct timeval *x, struct timeval *y)
   return x->tv_sec < y->tv_sec;
 }
 
-int timeout_register(int secs,timeout_handler handler,void *usr_ctx)
+int timeout_register(int secs,timeout_handler handler,int usr_ctx)
 {
 	timer_lib_t 	*timer_lib_temp = NULL,**temp_head = &head,*temp_prev = NULL;
 	struct timeval   *now;
@@ -113,6 +120,9 @@ int timeout_register(int secs,timeout_handler handler,void *usr_ctx)
 	timer_lib_temp->handler = handler;
 	timer_lib_temp->usr_ctx = usr_ctx;
 
+	/* sort the doubly in ascending*/
+	pthread_mutex_lock(&doubly_lock);
+
 	while(*temp_head != NULL)
 	{
 		//difftime(a,b) ---> a-b
@@ -128,6 +138,8 @@ int timeout_register(int secs,timeout_handler handler,void *usr_ctx)
 		(*temp_head)->prev = timer_lib_temp;
 	}
 	*temp_head = timer_lib_temp;
+
+	pthread_mutex_unlock(&doubly_lock);
 }
 
 
@@ -135,44 +147,87 @@ int timeout_register(int secs,timeout_handler handler,void *usr_ctx)
 int timeout_deregister(timer_lib_t **temp_head)
 {
 	 timer_lib_t *kill_me = *temp_head;;
-	 
+
 	*temp_head = (*temp_head)->next;
 	 if(*temp_head)
 		 (*temp_head)->prev = NULL;
-	 free(kill_me);
+	free(kill_me);
+
 }
 
-int main()
+void* fire_me()
 {
-	struct timeval now;
+		
 	timer_lib_t **temp_head = &head;
-
-	timeout_register(2,&temp_handler,(void *)1);
-	timeout_register(3,&temp_handler,(void *)2);
-	timeout_register(4,&temp_handler,(void *)3);
-	timeout_register(5,&temp_handler,(void *)4);
-	timeout_register(6,&temp_handler,(void *)5);
+	struct timeval now;
 
 	/* I am infinite, i am god */
-	printf("\n Timer library starting :");
-	print_currenttime();
+	while(TRUE){
  
-	while(1){
-		
+	 
+		pthread_mutex_lock(&doubly_lock);
+
 		if(*temp_head){
 			gettimeofday(&now,0);
 
 			if(timeval_subtract(&now,&((*temp_head)->expire_timer)))
-				continue;
+			{
 
-			/* Strinking the clock, calling the paylod */
+				// give others a chance to take the lock
+				pthread_mutex_unlock(&doubly_lock);
+				continue;
+			}
+
+			/* Strinking the clock, calling the payload */
 
 			(*temp_head)->handler((*temp_head)->usr_ctx);
-			
+
 			/* rework on the doubly, remove the expired*/
-			
+
 			timeout_deregister(temp_head);
-		}		
+		}
+		// give others a chance to take the lock
+		pthread_mutex_unlock(&doubly_lock);
 	}
-	timeout_print();	
+
 }
+
+void* add_random_timer()
+{
+	int i=0,temp_timeout;
+	struct timeval seed;
+	
+	gettimeofday(&seed,0);
+
+	srandom(seed.tv_sec % 1000);
+	
+	while(TRUE){
+		
+		temp_timeout = random()%MAX_TIMER;
+		i++;
+		printf("\n function NO %d register timeout - %d  ",i ,temp_timeout);	
+		print_currenttime();
+		timeout_register(temp_timeout,&temp_handler,i);
+
+		//Add timers slowly, lets not put too much in
+		sleep(MAX_TIMER/2);
+
+	}
+}
+
+int main()
+{
+	pthread_t thread1,thread2;
+	int ithread1,ithread2;
+
+	printf("\n Timer library starting :");
+	print_currenttime();
+
+ 	ithread1 = pthread_create( &thread1, NULL, fire_me, NULL);
+	ithread2 = pthread_create( &thread2, NULL, add_random_timer, NULL);
+
+	pthread_join(thread1,NULL);
+	pthread_join(thread2,NULL);
+	//timeout_print();
+}
+
